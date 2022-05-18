@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -21,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.rulhouse.junrarpractice.ui.theme.JunrarPracticeTheme
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -40,6 +42,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+val languageDownloader = LanguageDownloader()
+
 @OptIn(DelicateCoroutinesApi::class)
 @Composable
 fun Greeting(name: String) {
@@ -55,6 +59,13 @@ fun Greeting(name: String) {
             modifier = Modifier
                 .align(Alignment.Center)
         ) {
+            Button(
+                onClick = {
+                    languageDownloader.stop()
+                }
+            ) {
+                Text("Stop")
+            }
             Text(text = "State: ")
             Text(text = downloadState.value)
         }
@@ -76,12 +87,21 @@ fun Greeting(name: String) {
             Log.d("TestDownload", "onNetworkError")
             downloadState.value = "onNetworkError"
         }
+
+        override fun onProgressUpdate(nowSize: Long, size: Long) {
+            Log.d("TestDownload", "onProgressUpdate")
+            downloadState.value = "$nowSize / $size"
+        }
+
+        override fun onStop() {
+            Log.d("TestDownload", "onStop")
+            downloadState.value = "onStop"
+        }
     }
 
     LaunchedEffect(key1 = true) {
         GlobalScope.launch {
             val fileName = "zhs_sichuan.rar"
-            val languageDownloader = LanguageDownloader()
             languageDownloader.setOnDownloadListener(onDownloadVoiceListener)
             languageDownloader.extractFromAFileToADirectory(fileName, context)
         }

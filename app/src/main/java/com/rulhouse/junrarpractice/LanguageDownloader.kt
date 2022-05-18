@@ -5,35 +5,52 @@ import android.net.ConnectivityManager
 import android.os.Environment
 import android.util.Log
 import com.github.junrar.Junrar
-import com.github.junrar.exception.RarException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.net.URL
+import java.net.URLConnection
 
 class LanguageDownloader {
     private var onDownloadVoiceListener: OnDownloadVoiceListener? = null
+
+    private var isStop = false
 
     interface OnDownloadVoiceListener {
         fun onStart()
         fun onSuccess()
         fun onNetworkError()
+        fun onProgressUpdate(nowSize: Long, size: Long)
+        fun onStop()
     }
 
     fun setOnDownloadListener(onDownloadVoiceListener: OnDownloadVoiceListener) {
         this.onDownloadVoiceListener = onDownloadVoiceListener
     }
 
-    suspend fun extractFromAFileToADirectory(fileName: String, context: Context) {
+    fun stop() {
+        isStop = true
+    }
+
+    fun extractFromAFileToADirectory(fileName: String, context: Context) {
         try {
             onDownloadVoiceListener?.onStart()
+            if (isStop) {
+                onDownloadVoiceListener?.onStop()
+                return
+            }
             downloadRar(fileName = fileName, context = context)
+            if (isStop) {
+                onDownloadVoiceListener?.onStop()
+                return
+            }
             extractRar(fileName = fileName, context = context)
-            onDownloadVoiceListener?.onSuccess()
+            if (isStop) {
+                onDownloadVoiceListener?.onStop()
+                return
+            } else {
+                onDownloadVoiceListener?.onSuccess()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             Log.d("TestDownload", "Download Error")
@@ -59,12 +76,14 @@ class LanguageDownloader {
         }
     }
 
-    private suspend fun downloadRar(fileName: String, context: Context) {
+    @Suppress("BlockingMethodInNonBlockingContext")
+    private fun downloadRar(fileName: String, context: Context) {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val ni = cm.activeNetworkInfo
         val tempDir = getRarFileDir(context)
         createFolder(tempDir)
         val url = URL("https://oucarevoice.s3.amazonaws.com/$fileName")
+        val size = getFileSize(url)
         val fileDir = tempDir
 
         val input = BufferedInputStream(url.openStream())
@@ -72,14 +91,19 @@ class LanguageDownloader {
 
         val data = ByteArray(1024)
         var count: Int
+        var nowSize: Long = 0
+
         while (input.read(data, 0, 1024).also {
                 count = it
+                nowSize += it
             } != -1) {
+            onDownloadVoiceListener?.onProgressUpdate(size = size, nowSize = nowSize)
             if (!ni!!.isConnected) {
                 output.close()
                 input.close()
                 break
             }
+            if (isStop) break
             output.write(data, 0, count)
         }
 
@@ -88,12 +112,23 @@ class LanguageDownloader {
         input.close()
     }
 
-    private suspend fun extractRar(fileName: String, context: Context) {
+    private fun extractRar(fileName: String, context: Context) {
         val saveDir =
             context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.path
         if (saveDir != null) {
             createFolder(saveDir)
         }
         Junrar.extract("${getRarFileDir(context)}/$fileName", saveDir)
+    }
+
+    private fun stopEvent() {
+        onDownloadVoiceListener?.onStop()
+    }
+
+    private fun getFileSize(url: URL): Long {
+        val connection: URLConnection = url.openConnection()
+        connection.connect()
+
+        return connection.contentLengthLong
     }
 }
