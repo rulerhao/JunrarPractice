@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Button
@@ -55,19 +56,24 @@ fun Greeting(name: String) {
         modifier = Modifier
             .fillMaxSize()
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .align(Alignment.Center)
         ) {
             Button(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally),
                 onClick = {
                     languageDownloader.stop()
                 }
             ) {
                 Text("Stop")
             }
-            Text(text = "State: ")
-            Text(text = downloadState.value)
+            Row(
+            ) {
+                Text(text = "State: ")
+                Text(text = downloadState.value)
+            }
         }
     }
 
